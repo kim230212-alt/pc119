@@ -126,12 +126,10 @@ def iter_mp3(in_dir: Path, scan_subdirs: bool):
             if p.is_file() and p.suffix.lower() == ".mp3" and not p.name.startswith(("_",".","_logs","_done")):
                 yield p
         return
-    # subdirs: 3레벨까지만 기본 스캔 (원하면 늘려도 됨)
     for p in in_dir.rglob("*.mp3"):
-        # 관리폴더 제외
-        if "/_logs/" in str(p) or "/_done/" in str(p): 
+        if "/_logs/" in str(p) or "/_done/" in str(p):
             continue
-        if p.name.startswith(("_",".")): 
+        if p.name.startswith(("_",".")):
             continue
         yield p
 
@@ -142,7 +140,6 @@ def main():
     ap.add_argument("--lock", default="/tmp/voicerec_stt.lock")
     args = ap.parse_args()
 
-    # 중복 실행 방지(락 파일)
     lock = Path(args.lock)
     try:
         lock.write_text(str(os.getpid()), encoding="utf-8")
@@ -171,7 +168,6 @@ def main():
     model = get_model(model_name, compute_type, log_file)
 
     for p in iter_mp3(in_dir, scan_subdirs):
-        # 파일 복사 중이면 스킵
         if not stable_file(p):
             with log_file.open("a", encoding="utf-8") as f:
                 f.write(f"[{now()}] SKIP_NOT_STABLE {p}\n")
@@ -180,11 +176,9 @@ def main():
         who = prefix3(p.stem, 3)
         day = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d")
 
-        # voicerec 내부에서 바로 분류
         dst_dir = in_dir / who / day
         src = p
 
-        # 이미 분류된 경로면 이동 생략
         if dst_dir not in src.parents:
             try:
                 src = move_unique(src, dst_dir)
@@ -208,7 +202,6 @@ def main():
                 f.write(f"[{now()}] STT_FAIL {src} err={e}\n")
             continue
 
-        # 처리 완료 mp3를 _done으로 이동(옵션)
         if done_move:
             try:
                 ensure_dir(done_dir)
@@ -238,7 +231,6 @@ cat > "${STATUS}" <<EOF
 set -eu
 echo "== CONFIG =="; ls -lh "${CONFIG}" || true
 echo "== CRON =="; grep "${PKG_TAG}" /etc/crontab || true
-echo "== VENV =="; ls -lh "${VENV_DIR}" || true
 echo "== LAST LOG =="; tail -n 50 "${LOG_FILE}" 2>/dev/null || true
 echo "== CRON LOG =="; tail -n 50 "${CRON_LOG}" 2>/dev/null || true
 EOF
@@ -284,4 +276,4 @@ echo ""
 echo "[9/9] Test now:"
 echo "  . ${VENV_DIR}/bin/activate && python ${PIPELINE} --config ${CONFIG}"
 
-
+exit 0
