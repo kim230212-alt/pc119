@@ -72,16 +72,20 @@ from datetime import datetime
 from typing import Optional
 from faster_whisper import WhisperModel
 
-def now(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def ensure_dir(p: Path): p.mkdir(parents=True, exist_ok=True)
+def ensure_dir(p: Path):
+    p.mkdir(parents=True, exist_ok=True)
 
 def stable_file(p: Path, checks=3, interval=2) -> bool:
     last = -1
     for _ in range(checks):
-        if not p.exists(): return False
+        if not p.exists():
+            return False
         sz = p.stat().st_size
-        if sz == last and sz > 0: return True
+        if sz == last and sz > 0:
+            return True
         last = sz
         time.sleep(interval)
     return p.exists() and p.stat().st_size == last and last > 0
@@ -110,7 +114,8 @@ def transcribe_to_txt(model: WhisperModel, mp3: Path, txt: Path, lang: str):
     with txt.open("w", encoding="utf-8") as f:
         for seg in segments:
             t = (seg.text or "").strip()
-            if t: f.write(t + "\n")
+            if t:
+                f.write(t + "\n")
 
 def move_unique(src: Path, dst_dir: Path) -> Path:
     ensure_dir(dst_dir)
@@ -123,13 +128,19 @@ def move_unique(src: Path, dst_dir: Path) -> Path:
 def iter_mp3(in_dir: Path, scan_subdirs: bool):
     if not scan_subdirs:
         for p in in_dir.iterdir():
-            if p.is_file() and p.suffix.lower() == ".mp3" and not p.name.startswith(("_",".","_logs","_done")):
+            if p.is_file() and p.suffix.lower() == ".mp3" and not p.name.startswith(("_", ".")):
+                # 관리폴더 제외
+                if p.parent.name in ("_logs", "_done"):
+                    continue
                 yield p
         return
+
+    # subdirs: 전체 스캔 (관리폴더 제외)
     for p in in_dir.rglob("*.mp3"):
-        if "/_logs/" in str(p) or "/_done/" in str(p):
+        sp = str(p)
+        if "/_logs/" in sp or "/_done/" in sp:
             continue
-        if p.name.startswith(("_",".")):
+        if p.name.startswith(("_", ".")):
             continue
         yield p
 
@@ -147,14 +158,14 @@ def main():
         pass
 
     cfg = load_cfg(args.config)
-    in_dir = Path(cfg.get("paths","in_dir", fallback="/volume1/voicerec"))
-    model_name = cfg.get("stt","model", fallback="small")
-    compute_type = cfg.get("stt","compute_type", fallback="int8")
-    lang = cfg.get("stt","language", fallback="ko")
+    in_dir = Path(cfg.get("paths", "in_dir", fallback="/volume1/voicerec"))
+    model_name = cfg.get("stt", "model", fallback="small")
+    compute_type = cfg.get("stt", "compute_type", fallback="int8")
+    lang = cfg.get("stt", "language", fallback="ko")
 
-    scan_subdirs = cfg.get("options","scan_subdirs", fallback="0") == "1"
-    done_move = cfg.get("options","done_move", fallback="0") == "1"
-    done_dir = Path(cfg.get("options","done_dir", fallback=str(in_dir / "_done")))
+    scan_subdirs = cfg.get("options", "scan_subdirs", fallback="0") == "1"
+    done_move = cfg.get("options", "done_move", fallback="0") == "1"
+    done_dir = Path(cfg.get("options", "done_dir", fallback=str(in_dir / "_done")))
 
     log_dir = in_dir / "_logs"
     ensure_dir(log_dir)
@@ -168,6 +179,7 @@ def main():
     model = get_model(model_name, compute_type, log_file)
 
     for p in iter_mp3(in_dir, scan_subdirs):
+        # 파일 복사 중이면 스킵
         if not stable_file(p):
             with log_file.open("a", encoding="utf-8") as f:
                 f.write(f"[{now()}] SKIP_NOT_STABLE {p}\n")
@@ -179,6 +191,7 @@ def main():
         dst_dir = in_dir / who / day
         src = p
 
+        # 이미 분류된 경로면 이동 생략
         if dst_dir not in src.parents:
             try:
                 src = move_unique(src, dst_dir)
@@ -202,6 +215,7 @@ def main():
                 f.write(f"[{now()}] STT_FAIL {src} err={e}\n")
             continue
 
+        # 처리 완료 mp3를 _done으로 이동(옵션)
         if done_move:
             try:
                 ensure_dir(done_dir)
@@ -223,6 +237,7 @@ def main():
 if __name__ == "__main__":
     main()
 PY
+
 chmod +x "${PIPELINE}"
 
 echo "[5/9] Write status/uninstall helpers..."
@@ -277,4 +292,3 @@ echo "[9/9] Test now:"
 echo "  . ${VENV_DIR}/bin/activate && python ${PIPELINE} --config ${CONFIG}"
 
 exit 0
-
