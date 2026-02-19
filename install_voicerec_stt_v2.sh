@@ -284,3 +284,4 @@ echo ""
 echo "[9/9] Test now:"
 echo "  . ${VENV_DIR}/bin/activate && python ${PIPELINE} --config ${CONFIG}"
 
+
